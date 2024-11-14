@@ -6,11 +6,16 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static('public'));
 
-// Your OpenAI API key should be set in Render’s environment variables
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 app.post('/api/chat', async (req, res) => {
     const userInput = req.body.message;
+    console.log("Received user input:", userInput);
+
+    if (!OPENAI_API_KEY) {
+        console.error("OpenAI API key is missing");
+        return res.status(500).json({ error: "OpenAI API key is not set" });
+    }
 
     try {
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -26,9 +31,18 @@ app.post('/api/chat', async (req, res) => {
             })
         });
 
-        const data = await response.json();
+        // Check and log error responses from OpenAI
+        if (!response.ok) {
+            const errorDetail = await response.json();
+            console.error("Error from OpenAI:", errorDetail);
+            return res.status(response.status).json({ error: errorDetail });
+        }
 
-        // Check if the response from OpenAI contains the expected structure
+        // Process the successful response
+        const data = await response.json();
+        console.log("Response data from OpenAI:", data);
+
+        // Check if data contains the expected response structure
         if (data.choices && data.choices[0] && data.choices[0].message) {
             res.json({ reply: data.choices[0].message.content });
         } else {
@@ -36,7 +50,7 @@ app.post('/api/chat', async (req, res) => {
             res.status(500).json({ error: "Unexpected response from OpenAI" });
         }
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Fetch error:", error.message);
         res.status(500).json({ error: "Error fetching response from OpenAI" });
     }
 });
